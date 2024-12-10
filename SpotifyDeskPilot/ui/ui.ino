@@ -7,7 +7,7 @@
 #include <ArduinoJson.h>
 #include <SimpleFOC.h>
 #include <TFT_eSPI.h>
-
+#include <ReactESP.h>
 
 /* Don't forget to set Sketchbook location in File/Preferences to the path of your UI project (the parent folder of this INO file) */
 
@@ -18,7 +18,8 @@ const int filterWindowSize = 10;  // Moving average window size
 float angleBuffer[filterWindowSize] = { 0 };
 float velocityBuffer[filterWindowSize] = { 0 };
 int angle_bufferIndex = 0;
-bool isMoving = false;
+bool isMoving = true;
+unsigned long previousMillis = 0;
 
 float prevAngleDeg = 0;
 void doPWM() {
@@ -36,8 +37,6 @@ const unsigned long stopThreshold = 500;  // Time in milliseconds (0.5 second) f
 const unsigned long checkSongInterval = 5500;  // 5000 milliseconds = 5 seconds
 
 // Store the last time the function was called
-unsigned long previousMillis = 0;
-unsigned long previousSecond = 0;
 unsigned long seconds = 0;
 String prevSong = "";
 String prevArtist = "";
@@ -62,6 +61,12 @@ TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite ui_songInfo = TFT_eSprite(&tft);
 TFT_eSprite ui_volume = TFT_eSprite(&tft);
 
+
+/* ------------------------------ Async Event Loop --------------------------*/
+using namespace reactesp;
+
+EventLoop event_loop;
+
 /* ----------------------------- UI Functions ----------------------------- */
 void ui_setup() {
   tft.init();
@@ -80,6 +85,8 @@ void ui_setup() {
   ui_volume.pushSprite(0, 0);
 }
 
+int songInfoScrollOffset = 0;
+int artistInfoScrollOffset = 0;
 void setSongInfo() {
     // Clear the sprite to the background color
     ui_songInfo.createSprite(210, ui_songInfo.fontHeight()*7.5);
@@ -88,10 +95,36 @@ void setSongInfo() {
     ui_songInfo.setTextColor(TFT_WHITE);
     // Draw the song info text
     ui_songInfo.setTextSize(2);
-    ui_songInfo.drawString(prevSong, ui_songInfo.width()/2, ui_songInfo.fontHeight()/2); // Title
+    int songInfoWidth = tft.textWidth(prevSong) * 2;
+    if(songInfoWidth > ui_songInfo.width()) {
+      songInfoScrollOffset += 1;
+    } else {
+      songInfoScrollOffset = 0;
+    }
+
+    int songInfoPos = ui_songInfo.width()/2 + songInfoScrollOffset;
+    if(songInfoPos > ui_songInfo.width() + songInfoWidth/2) {
+      songInfoScrollOffset = -ui_songInfo.width()/2 - songInfoWidth/2;
+      songInfoPos = -songInfoWidth/2;
+    }
+
+    ui_songInfo.drawString(prevSong, songInfoPos, ui_songInfo.fontHeight()/2); // Title
 
     ui_songInfo.setTextSize(1);
-    ui_songInfo.drawString(prevArtist, ui_songInfo.width()/2, ui_songInfo.fontHeight()*3); // Artist
+    int artistInfoWidth = tft.textWidth(prevArtist);
+    if(artistInfoWidth > ui_songInfo.width()) {
+      artistInfoScrollOffset += 1;
+    } else {
+      artistInfoScrollOffset = 0;
+    }
+
+    int artistInfoPos = ui_songInfo.width()/2 + artistInfoScrollOffset;
+    if(artistInfoPos > ui_songInfo.width() + artistInfoWidth/2) {
+      artistInfoScrollOffset = -ui_songInfo.width()/2 - artistInfoWidth/2;
+      artistInfoPos = -artistInfoWidth/2;
+    }
+
+    ui_songInfo.drawString(prevArtist, artistInfoPos, ui_songInfo.fontHeight()*3); // Artist
 
     if(seconds > prevDuration) seconds = prevDuration;
 
@@ -129,7 +162,7 @@ void setVolume(int volume) {
   }
 
   ui_volume.setTextSize(1);
-  ui_volume.drawString(String(volume), ui_volume.width()/2, ui_volume.fontHeight()/2 + 30);
+  ui_volume.drawString(String(volume), ui_volume.width()/2, ui_volume.fontHeight()/2 + 15);
   setSongInfo();
   ui_volume.pushSprite(0, 0);
   ui_volume.deleteSprite();
@@ -149,76 +182,77 @@ void spotify_setup() {
 
 void getSong() {
   if (connection.isConnected) {
-    String playingInfo = spotify.GetCurrentlyPlaying();
-    JsonDocument doc = ParseJson(playingInfo);
-    String error = String(doc["error"]);
+    event_loop.onDelay(0, []() {
+      String playingInfo = spotify.GetCurrentlyPlaying();
+      JsonDocument doc = ParseJson(playingInfo);
+      String error = String(doc["error"]);
 
-    // Error handling
-    if (error.equals("null")) {
-      String song = String(doc["item"]["name"]);
-      JsonArray artists = doc["item"]["artists"].as<JsonArray>();
-      String artist = "";
+      // Error handling
+      if (error.equals("null")) {
+        String song = String(doc["item"]["name"]);
+        JsonArray artists = doc["item"]["artists"].as<JsonArray>();
+        String artist = "";
 
-      for (JsonObject v : artists) {
-        if (!artist.isEmpty()) {
-          artist += ", "; // Add a separator between artist names
+        for (JsonObject v : artists) {
+          if (!artist.isEmpty()) {
+            artist += ", "; // Add a separator between artist names
+          }
+          artist += v["name"].as<String>();
         }
-        artist += v["name"].as<String>();
-      }
-      String progressString = String(doc["progress_ms"]);
-      String durationString = String(doc["item"]["duration_ms"]);
-      String volume = String(doc["device"]["volume_percent"]);
+        String progressString = String(doc["progress_ms"]);
+        String durationString = String(doc["item"]["duration_ms"]);
+        String volume = String(doc["device"]["volume_percent"]);
 
-      isPlaying = doc["is_playing"];
+        isPlaying = doc["is_playing"];
 
 
-      if (!song.equals(prevSong)) {
-        prevSong = song;
-        // Serial.print("SONG: ");
-        // Serial.println(song);
-        // set ui song
-      }
-
-      if (!artist.equals(prevArtist)) {
-        prevArtist = artist;
-        // Serial.print("ARTIST: ");
-        // Serial.println(artist);
-        // set ui artist
-      }
-
-      if (!volume.equals(prevVolume) && !isMoving) {
-        prevVolume = volume;
-        // Serial.print("VOLUME: ");
-        // Serial.println(volume);
-        setVolume(volume.toInt());
-
-        // set ui volume
-      }
-
-      unsigned long duration_ms = durationString.toInt();
-      if (!(duration_ms == 0 && progressString != "0")) {
-        unsigned long duration = duration_ms / 1000;
-        if (duration != prevDuration) {
-          prevDuration = duration;
+        if (!song.equals(prevSong)) {
+          prevSong = song;
+          // Serial.print("SONG: ");
+          // Serial.println(song);
+          // set ui song
         }
-      }
 
-      unsigned long progress_ms = progressString.toInt();
-      if (progress_ms == 0 && progressString != "0") {
-        Serial.println("Loading time...");
+        if (!artist.equals(prevArtist)) {
+          prevArtist = artist;
+          // Serial.print("ARTIST: ");
+          // Serial.println(artist);
+          // set ui artist
+        }
+
+        if (!volume.equals(prevVolume) && !isMoving) {
+          prevVolume = volume;
+          // Serial.print("VOLUME: ");
+          // Serial.println(volume);
+          setVolume(volume.toInt());
+
+          // set ui volume
+        }
+
+        unsigned long duration_ms = durationString.toInt();
+        if (!(duration_ms == 0 && progressString != "0")) {
+          unsigned long duration = duration_ms / 1000;
+          if (duration != prevDuration) {
+            prevDuration = duration;
+          }
+        }
+
+        unsigned long progress_ms = progressString.toInt();
+        if (progress_ms == 0 && progressString != "0") {
+          Serial.println("Loading time...");
+        } else {
+          seconds = progress_ms / 1000;
+        }
+
       } else {
-        seconds = progress_ms / 1000;
+        prevSong = "Not Playing";
+        prevArtist = "";
+        prevDuration = 0;
+        Serial.print(prevSong);
+        // set ui not playing
       }
-
-    } else {
-      prevSong = "Not Playing";
-      prevArtist = "";
-      prevDuration = 0;
-      Serial.print(prevSong);
-      // set ui not playing
-    }
-
-    connection.GetNetworkInfo(false);
+      connection.GetNetworkInfo(false);
+    });
   } else {
     Serial.println("Connect to a wifi network");
     //set ui not connected
@@ -230,20 +264,23 @@ void checkPlayPause() {
   currentState = digitalRead(BUTTON_PIN);
 
   if (currentState != lastState && currentState == HIGH) {
-    int code = spotify.PlayPause(isPlaying);
-    isPlaying = !isPlaying;
+    event_loop.onDelay(0, [] () {
+      spotify.PlayPause(isPlaying);
+      isPlaying = !isPlaying;
 
-    if (!isPlaying) {
-      Serial.println("Paused");
-          prevSong = "Paused";
+      if (!isPlaying) {
+        Serial.println("Paused");
+            prevSong = "Paused";
 
-      // set ui paused
-    } else {
-      Serial.println("Playing");
-      prevSong = "Playing";
-      // set ui playing
-    }
-    prevArtist = "";
+        // set ui paused
+      } else {
+        Serial.println("Playing");
+        prevSong = "Playing";
+        // set ui playing
+      }
+      prevArtist = "";
+    });
+    
     // clear artist ui
   }
 
@@ -255,7 +292,7 @@ void checkVolumeChange() {
   sensor.update();
 
   // Get the raw angle and angular velocity in radians and radians/second
-  float angleRad = sensor.getAngle();
+  float angleRad = -sensor.getAngle();
   float velocityRadS = sensor.getVelocity();
 
   // Add raw data to buffers
@@ -278,18 +315,31 @@ void checkVolumeChange() {
   float velocityDegSRounded = round(velocityDegS / 10);  // Quantize to 10 deg/s steps
 
   // convert to percentage of 360
-  float percentage = (abs((int)angleDegRounded) % 360) * 100 / 360;
+  int percentage = angleDegRounded * 100 / 360;
   // set ui volume
-  setVolume(round(percentage));
+  if(percentage < 0) {
+    percentage = 0;
+  }
 
-  if (velocityDegSRounded == 0 && abs(prevVolume.toInt() - round(percentage)) > 1) {
-    prevVolume = String(round(percentage));
+  if (percentage > 100) {
+    percentage = 100;
+  } 
 
-    if (spotify.SetVolume(round(percentage)) == 204) {
-      // set ui volume
-      Serial.println("SPOTIFY CHANGED: " + prevVolume);
+  if(!prevSong.isEmpty()) setVolume(percentage);
+
+  if (velocityDegSRounded == 0 && abs(prevVolume.toInt() - percentage) > 1) {
+    if(millis() - previousMillis > 1000) {
+      prevVolume = String(percentage);
+
+      event_loop.onDelay(0, [percentage, isMoving]() {
+        if (spotify.SetVolume(round(percentage)) != 204) {
+          // set ui volume
+          Serial.println("ERR-VOLUME NOT SET");
+        }
+        isMoving = false;
+      });
+      previousMillis = millis();
     }
-    isMoving = false;
   } else {
     isMoving = true;
   }
@@ -347,6 +397,7 @@ bool isInteger(const char* str) {
 void encoder_init() {
   // Initialise magnetic sensor hardware
   sensor.init();
+
   // Comment out to use sensor in blocking (non-interrupt) way
   sensor.enableInterrupt(doPWM);
 
@@ -361,27 +412,25 @@ void setup() {
 
   spotify_setup();
   Serial.println("Setup done");
+  event_loop.onTick([] () {
+    checkPlayPause();
+    checkVolumeChange();
+  });
+
+
+  event_loop.onRepeat(checkSongInterval, [] () {
+    getSong();
+  });
+
+  event_loop.onRepeat(1000, [] () {
+    if(isPlaying) {
+      seconds = seconds + 1;
+    }
+  });
 }
 
 void loop() {
-  checkPlayPause();
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= checkSongInterval) {
-    previousMillis = currentMillis;
-    getSong();
-  }
-
-  if (currentMillis - previousSecond >= 1000 && isPlaying) {
-    previousSecond = currentMillis;
-    seconds = seconds + 1;
-    String time = convertSecondsToMinutes(seconds);
-    // Serial.println("AUTO TIME: " + time);
-    // set ui time
-    int32_t progressPercent = (int)100 * ((float)seconds / prevDuration);
-    // Serial.println("AUTO PROGRESS: " + String(progressPercent));
-    // set ui progress
-  }
-
+  event_loop.tick();
 
   while (Serial.available()) {
     char incomingChar = Serial.read();  // Read a character
@@ -416,7 +465,4 @@ void loop() {
       inputBuffer[bufferIndex++] = incomingChar;  // Add character to buffer
     }
   }
-
-  checkVolumeChange();
-  delay(5);
 }

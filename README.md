@@ -13,6 +13,7 @@ A device that controls the playback of Spotify using an ESP32 development board
 - add 'SimpleFOC' from library manager. (SimpleFOC by Simplefoc)
 - add 'ArduinoJson' from library manager. (ArduinoJson by Benoit Blanchon)
 - add 'TFT_eSPI' from library manager. (TFT_eSPI by Bodmer)
+- add 'ReactESP' from library manager. (ReactESP by Matti Airas). This allows non blocking calls
 - upload hold down 'FLASH' button and click upload (see ESP-WROOM-32 for more info)
 
 ## ESP-WROOM-32
@@ -70,6 +71,7 @@ the following ports are where each pin is connected:
 - [x] volume
 - [x] refresh auth tokens
 - [ ] async api calls
+- [ ] anti aliased text
 - [ ] connect buttons to said Spotify methods
 - [x] connect magnetic encoder to control the above methods
 - [ ] add gimbal motor haptic feedback to receive audio differences
