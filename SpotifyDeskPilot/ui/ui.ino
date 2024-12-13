@@ -13,6 +13,10 @@
 
 MagneticSensorPWM sensor = MagneticSensorPWM(32, 2, 935);
 
+BLDCMotor motor = BLDCMotor(11);
+BLDCDriver6PWM driver = BLDCDriver6PWM(13, 22, 14, 12, 25, 27);
+
+
 // Filter parameters
 const int filterWindowSize = 10;  // Moving average window size
 float angleBuffer[filterWindowSize] = { 0 };
@@ -20,6 +24,7 @@ float velocityBuffer[filterWindowSize] = { 0 };
 int angle_bufferIndex = 0;
 bool isMoving = true;
 unsigned long previousMillis = 0;
+bool movingToPos = true;
 
 float prevAngleDeg = 0;
 void doPWM() {
@@ -31,7 +36,9 @@ unsigned long stopTime = 0;
 const unsigned long stopThreshold = 500;  // Time in milliseconds (0.5 second) for the motor to be considered stopped
 
 // Setting pins
-#define BUTTON_PIN 26  // GIOP26 pin connected to button
+#define PLAYPAUSE_PIN 17  // GIOP26 pin connected to button
+#define NEXTBUTTON_PIN 26  // GIOP26 pin connected to button
+#define PREVBUTTON_PIN 16  // GIOP26 pin connected to button
 
 // Interval for periodic execution in milliseconds
 const unsigned long checkSongInterval = 5500;  // 5000 milliseconds = 5 seconds
@@ -49,8 +56,12 @@ ConnectionManager connection = ConnectionManager(ssid, password);
 SpotifyClient spotify = SpotifyClient(clientId, clientSecret, refreshToken);
 
 // button check
-int currentState;
-int lastState = HIGH;
+int currentPlayPauseState;
+int lastPlayPauseState = HIGH;
+int currentNextState;
+int lastNextState = HIGH;
+int currentPrevState;
+int lastPrevState = HIGH;
 // serial input
 const int MAX_BUFFER_SIZE = 16;  // Maximum size for the input buffer
 char inputBuffer[MAX_BUFFER_SIZE];
@@ -177,7 +188,10 @@ void spotify_setup() {
   Serial.println("Connected");
 
   // Initialize the pushbutton pin as a pull-up input
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(PLAYPAUSE_PIN, INPUT_PULLUP);
+  pinMode(NEXTBUTTON_PIN, INPUT_PULLUP);
+  pinMode(PREVBUTTON_PIN, INPUT_PULLUP);
+
 }
 
 void getSong() {
@@ -219,12 +233,13 @@ void getSong() {
           // Serial.println(artist);
           // set ui artist
         }
-
-        if (!volume.equals(prevVolume) && !isMoving) {
+        if (!volume.equals(prevVolume) && !isMoving || (motor.shaftAngle() > 0 || motor.shaftAngle() < -2*3.141592654)) {
           prevVolume = volume;
           // Serial.print("VOLUME: ");
           // Serial.println(volume);
-          setVolume(volume.toInt());
+          Serial.println("Volume: " + volume);
+          movingToPos = true;
+          motor.enable();
 
           // set ui volume
         }
@@ -261,9 +276,9 @@ void getSong() {
 
 void checkPlayPause() {
   // Read the state of the button:
-  currentState = digitalRead(BUTTON_PIN);
+  currentPlayPauseState = digitalRead(PLAYPAUSE_PIN);
 
-  if (currentState != lastState && currentState == HIGH) {
+  if (currentPlayPauseState != lastPlayPauseState && currentPlayPauseState == HIGH) {
     event_loop.onDelay(0, [] () {
       spotify.PlayPause(isPlaying);
       isPlaying = !isPlaying;
@@ -284,65 +299,106 @@ void checkPlayPause() {
     // clear artist ui
   }
 
-  lastState = currentState;
+  lastPlayPauseState = currentPlayPauseState;
+}
+
+void checkNext() {
+  // Read the state of the button:
+  currentNextState = digitalRead(NEXTBUTTON_PIN);
+
+  if (currentNextState != lastNextState && currentNextState == HIGH) {
+    event_loop.onDelay(0, [] () {
+      spotify.NextSong();
+    });
+    // clear artist ui
+  }
+
+  lastNextState = currentNextState;
+}
+
+void checkPrev() {
+ // Read the state of the button:
+  currentPrevState = digitalRead(PREVBUTTON_PIN);
+
+  if (currentPrevState != lastPrevState && currentPrevState == HIGH) {
+    event_loop.onDelay(0, [] () {
+      spotify.PrevSong();
+    });
+    // clear artist ui
+  }
+
+  lastPrevState = currentPrevState;
 }
 
 void checkVolumeChange() {
-  // Update the sensor data
-  sensor.update();
-
-  // Get the raw angle and angular velocity in radians and radians/second
-  float angleRad = -sensor.getAngle();
-  float velocityRadS = sensor.getVelocity();
-
-  // Add raw data to buffers
-  angleBuffer[angle_bufferIndex] = angleRad;
-  velocityBuffer[angle_bufferIndex] = velocityRadS;
-
-  // Compute the moving average for noise reduction
-  float angleRadFiltered = computeMovingAverage(angleBuffer, filterWindowSize);
-  float velocityRadSFiltered = computeMovingAverage(velocityBuffer, filterWindowSize);
-
-  // Update the buffer index
-  angle_bufferIndex = (angle_bufferIndex + 1) % filterWindowSize;
-
-  // Convert filtered values to degrees and degrees/second
-  float angleDeg = angleRadFiltered * (180.0 / 3.14159);          // Correct conversion
-  float velocityDegS = velocityRadSFiltered * (180.0 / 3.14159);  // Correct conversion
-
-  // Introduce rounding errors
-  float angleDegRounded = round(angleDeg * 2) / 2.0;     // Quantize to 0.5 degree steps
-  float velocityDegSRounded = round(velocityDegS / 10);  // Quantize to 10 deg/s steps
-
-  // convert to percentage of 360
-  int percentage = angleDegRounded * 100 / 360;
-  // set ui volume
-  if(percentage < 0) {
-    percentage = 0;
-  }
-
-  if (percentage > 100) {
-    percentage = 100;
-  } 
-
-  if(!prevSong.isEmpty()) setVolume(percentage);
-
-  if (velocityDegSRounded == 0 && abs(prevVolume.toInt() - percentage) > 1) {
-    if(millis() - previousMillis > 1000) {
-      prevVolume = String(percentage);
-
-      event_loop.onDelay(0, [percentage, isMoving]() {
-        if (spotify.SetVolume(round(percentage)) != 204) {
-          // set ui volume
-          Serial.println("ERR-VOLUME NOT SET");
-        }
+  float pi = 3.141592654;
+  if(movingToPos) {
+    isMoving = true;
+    float angleRads = -prevVolume.toInt() * 2 * pi/100;
+    motor.move(angleRads);
+    if(abs(motor.shaftAngle() - angleRads) < 0.05) {
         isMoving = false;
-      });
-      previousMillis = millis();
+        movingToPos = false;
+        motor.disable();
     }
   } else {
-    isMoving = true;
+    // Get the raw angle and angular velocity in radians and radians/second
+    float angleRad = -sensor.getAngle();
+    float velocityRadS = sensor.getVelocity();
+    // Add raw data to buffers
+    angleBuffer[angle_bufferIndex] = angleRad;
+    velocityBuffer[angle_bufferIndex] = velocityRadS;
+
+    // Compute the moving average for noise reduction
+    float angleRadFiltered = computeMovingAverage(angleBuffer, filterWindowSize);
+    float velocityRadSFiltered = computeMovingAverage(velocityBuffer, filterWindowSize);
+
+    // Update the buffer index
+    angle_bufferIndex = (angle_bufferIndex + 1) % filterWindowSize;
+
+    // Convert filtered values to degrees and degrees/second
+    float angleDeg = angleRadFiltered * (180.0 / pi);          // Correct conversion
+    float velocityDegS = velocityRadSFiltered * (180.0 / pi);  // Correct conversion
+
+    // Introduce rounding errors
+    float angleDegRounded = round(angleDeg * 2) / 2.0;     // Quantize to 0.5 degree steps
+    float velocityDegSRounded = round(velocityDegS / 10);  // Quantize to 10 deg/s steps
+
+    // convert to percentage of 360
+    int percentage = angleDegRounded * 100 / 360;
+    // set ui volume
+    if(percentage < 0) {
+      percentage = 0;
+    }
+
+    if (percentage > 100) {
+      percentage = 100;
+    } 
+
+    if(!prevSong.isEmpty()) setVolume(percentage);
+
+    if (velocityDegSRounded == 0) {
+      isMoving = false;
+      if(abs(prevVolume.toInt() - percentage) > 1.5) {
+          isMoving = true;
+          if(millis() - previousMillis > 1000) {
+            prevVolume = String(percentage);
+
+            event_loop.onDelay(0, [percentage]() {
+              if (spotify.SetVolume(round(percentage)) != 204) {
+                // set ui volume
+                Serial.println("ERR-VOLUME NOT SET");
+              }
+              isMoving = false;
+            });
+            previousMillis = millis();
+          }
+      }
+    } else {
+      isMoving = true;
+    }
   }
+  
 }
 
 
@@ -395,28 +451,86 @@ bool isInteger(const char* str) {
 
 /* ----------------------------- Setup and Loop ----------------------------- */
 void encoder_init() {
-  // Initialise magnetic sensor hardware
+  // enable more verbose output for debugging
+  // comment out if not needed
+  SimpleFOCDebug::enable(&Serial);
+
+  // initialise magnetic sensor hardware
   sensor.init();
-
-  // Comment out to use sensor in blocking (non-interrupt) way
   sensor.enableInterrupt(doPWM);
+  // link the motor to the sensor
+  motor.linkSensor(&sensor);
 
-  Serial.println("Sensor ready");
+  // driver config
+  // power supply voltage [V]
+  driver.voltage_power_supply = 5;
+  driver.init();
+  // link the motor and the driver
+  motor.linkDriver(&driver);
+
+  // choose FOC modulation (optional)
+  motor.foc_modulation = FOCModulationType::SpaceVectorPWM;
+
+  // set motion control loop to be used
+  motor.controller = MotionControlType::angle;
+
+  // contoller configuration
+  // default parameters in defaults.h
+
+  // velocity PI controller parameters
+  motor.PID_velocity.P = 0.2f;
+  motor.PID_velocity.I = 20;
+  motor.PID_velocity.D = 0;
+  // maximal voltage to be set to the motor
+  motor.voltage_limit = 12;
+
+  // velocity low pass filtering time constant
+  // the lower the less filtered
+  motor.LPF_velocity.Tf = 0.01f;
+
+  // angle P controller
+  motor.P_angle.P = 20;
+  // maximal velocity of the position control
+  motor.velocity_limit = 5;
+  
+  // comment out if not needed
+  motor.useMonitoring(Serial);
+
+
+  // initialize motor
+  motor.init();
+  // align sensor and start FOC
+  motor.initFOC();
+
+  Serial.println(F("Motor ready."));
   _delay(1000);
 }
 void setup() {
   Serial.begin(115200); /* Prepare for possible serial debug */
   encoder_init();
   ui_setup();
-  delay(3000);
-
   spotify_setup();
   Serial.println("Setup done");
+  getSong();
   event_loop.onTick([] () {
     checkPlayPause();
-    checkVolumeChange();
   });
 
+  event_loop.onTick([] () {
+    checkNext();
+  });
+
+  
+  event_loop.onTick([] () {
+    checkPrev();
+  });
+
+  
+  event_loop.onTick([] () {
+    motor.loopFOC();
+    // to do: add reset to the max and min
+    checkVolumeChange();
+  });
 
   event_loop.onRepeat(checkSongInterval, [] () {
     getSong();

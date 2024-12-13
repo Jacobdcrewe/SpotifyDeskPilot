@@ -56,6 +56,12 @@ the following ports are where each pin is connected:
 - install SimpleFOC by Simplefoc from library manager
 - connect to GND and 3v3. connect PWM to GPIO32
 
+## BUTTON PINS
+
+- play button connected to GPIO17
+- next button connected to GPIO26
+- prev button connected to GPIO16
+
 # TODO/Design
 
 ![alt text](image.png)
@@ -72,9 +78,9 @@ the following ports are where each pin is connected:
 - [x] refresh auth tokens
 - [ ] async api calls
 - [ ] anti aliased text
-- [ ] connect buttons to said Spotify methods
+- [x] connect buttons to said Spotify methods
 - [x] connect magnetic encoder to control the above methods
-- [ ] add gimbal motor haptic feedback to receive audio differences
+- [x] add gimbal motor haptic feedback to receive audio differences
 - [ ] add ability to connect board to WiFi without uploading code every time (probably requires seperate API calls) -[possible youtube solution](https://www.youtube.com/watch?v=JYtDibqJMs0&ab_channel=techiesms)
 - [ ] add ability to connect Spotify account without uploading code every time (probably requires seperate API calls)
 - [ ] figure out how to create a webhook to connect to Spotify playback (not possible with current Spotify documentation?)
