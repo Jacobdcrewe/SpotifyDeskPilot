@@ -48,6 +48,7 @@ unsigned long seconds = 0;
 String prevSong = "";
 String prevArtist = "";
 String prevVolume = "0";
+String prevDevice = "";
 unsigned long prevDuration = 0;
 bool isPlaying = false;
 
@@ -174,6 +175,7 @@ void setVolume(int volume) {
 
   ui_volume.setTextSize(1);
   ui_volume.drawString(String(volume), ui_volume.width()/2, ui_volume.fontHeight()/2 + 15);
+  ui_volume.drawString(prevDevice, ui_volume.width()/2, ui_volume.fontHeight()*2 + 15);
   setSongInfo();
   ui_volume.pushSprite(0, 0);
   ui_volume.deleteSprite();
@@ -203,6 +205,7 @@ void getSong() {
 
       // Error handling
       if (error.equals("null")) {
+        String device = String(doc["device"]["name"]);
         String song = String(doc["item"]["name"]);
         JsonArray artists = doc["item"]["artists"].as<JsonArray>();
         String artist = "";
@@ -242,6 +245,10 @@ void getSong() {
           motor.enable();
 
           // set ui volume
+        }
+
+        if(!device.equals(prevDevice)) {
+          prevDevice = device;
         }
 
         unsigned long duration_ms = durationString.toInt();
