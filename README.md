@@ -1,4 +1,4 @@
-# PlaybackPilot
+# Spotify Desk Pilot
 
 A device that controls the playback of Spotify using an ESP32 development board
 
