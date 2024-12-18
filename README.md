@@ -62,6 +62,23 @@ the following ports are where each pin is connected:
 - next button connected to GPIO26
 - prev button connected to GPIO16
 
+## Connnecting TMC6300 Motor Encoder
+
+![TMC6300 Motor Encoder](https://github.com/user-attachments/assets/c2af66b9-84dd-4e51-b2aa-9008fa7f3766)
+- VIO: GPIO?
+- UL: GPIO22
+- UH: GPIO13
+- VL: GPIO12
+- VH: GPIO14
+- WH: GPIO25
+- WL: GPIO27
+- VCP: NOTHING
+- GND (both): GND
+- DIAG: NOTHING
+- SEN: NOTHING
+- U, V, W: any of the gimbal pwm inputs
+- VIN: 5V (AKA VIN ON ESP32)
+  
 # TODO/Design
 
 ![alt text](image.png)
