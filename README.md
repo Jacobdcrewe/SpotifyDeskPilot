@@ -76,17 +76,17 @@ the following ports are where each pin is connected:
 - [x] pause
 - [x] volume
 - [x] refresh auth tokens
-- [ ] async api calls
-- [ ] anti aliased text
 - [x] connect buttons to said Spotify methods
 - [x] connect magnetic encoder to control the above methods
 - [x] add gimbal motor haptic feedback to receive audio differences
+- [x] connect display to esp32 -> display UI on esp32 [setting up display](https://dronebotworkshop.com/gc9a01/)
+- [ ] async api calls
+- [ ] anti aliased text
 - [ ] add ability to connect board to WiFi without uploading code every time (probably requires seperate API calls) -[possible youtube solution](https://www.youtube.com/watch?v=JYtDibqJMs0&ab_channel=techiesms)
 - [ ] add ability to connect Spotify account without uploading code every time (probably requires seperate API calls)
 - [ ] figure out how to create a webhook to connect to Spotify playback (not possible with current Spotify documentation?)
 - [ ] design UI to display the info (playback etc)
 - [ ] find way to display image on ui
-- [ ] connect display to esp32 -> display UI on esp32 [setting up display](https://dronebotworkshop.com/gc9a01/)
 
 - possible Todo
   -> aux?
