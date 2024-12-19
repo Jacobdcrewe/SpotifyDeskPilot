@@ -36,6 +36,7 @@ void ConnectionManager::Connect() {
 void ConnectionManager::GetNetworkInfo(bool printInfo) {
     if(WiFi.status() == WL_CONNECTED) {
       int rssi = WiFi.RSSI();
+      RSSI = rssi;
       if(printInfo) {
         Serial.print("[*] Network information for ");
         Serial.println(_ssid);

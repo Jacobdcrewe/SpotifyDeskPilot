@@ -36,9 +36,14 @@ unsigned long stopTime = 0;
 const unsigned long stopThreshold = 500;  // Time in milliseconds (0.5 second) for the motor to be considered stopped
 
 // Setting pins
-#define PLAYPAUSE_PIN 17  // GIOP26 pin connected to button
-#define NEXTBUTTON_PIN 26  // GIOP26 pin connected to button
-#define PREVBUTTON_PIN 16  // GIOP26 pin connected to button
+#define PLAYPAUSE_PIN 39  // GIOP39 pin connected to button
+#define NEXTBUTTON_PIN 36  // GIOP36 pin connected to button
+#define PREVBUTTON_PIN 34  // GIOP34 pin connected to button
+
+#define LED_1 26
+#define LED_2 21
+#define LED_3 19
+#define LED_4 17
 
 // Interval for periodic execution in milliseconds
 const unsigned long checkSongInterval = 5500;  // 5000 milliseconds = 5 seconds
@@ -190,9 +195,9 @@ void spotify_setup() {
   Serial.println("Connected");
 
   // Initialize the pushbutton pin as a pull-up input
-  pinMode(PLAYPAUSE_PIN, INPUT_PULLUP);
-  pinMode(NEXTBUTTON_PIN, INPUT_PULLUP);
-  pinMode(PREVBUTTON_PIN, INPUT_PULLUP);
+  pinMode(PLAYPAUSE_PIN, INPUT);
+  pinMode(NEXTBUTTON_PIN, INPUT);
+  pinMode(PREVBUTTON_PIN, INPUT);
 
 }
 
@@ -273,7 +278,6 @@ void getSong() {
         Serial.print(prevSong);
         // set ui not playing
       }
-      connection.GetNetworkInfo(false);
     });
   } else {
     Serial.println("Connect to a wifi network");
@@ -287,7 +291,9 @@ void checkPlayPause() {
 
   if (currentPlayPauseState != lastPlayPauseState && currentPlayPauseState == HIGH) {
     event_loop.onDelay(0, [] () {
+      SetLed(LOW,LOW,LOW,LOW);
       spotify.PlayPause(isPlaying);
+      GetNetworkInfo();
       isPlaying = !isPlaying;
 
       if (!isPlaying) {
@@ -315,7 +321,9 @@ void checkNext() {
 
   if (currentNextState != lastNextState && currentNextState == HIGH) {
     event_loop.onDelay(0, [] () {
+      SetLed(LOW,LOW,LOW,LOW);
       spotify.NextSong();
+      GetNetworkInfo();
     });
     // clear artist ui
   }
@@ -329,7 +337,9 @@ void checkPrev() {
 
   if (currentPrevState != lastPrevState && currentPrevState == HIGH) {
     event_loop.onDelay(0, [] () {
+      SetLed(LOW,LOW,LOW,LOW);
       spotify.PrevSong();
+      GetNetworkInfo();
     });
     // clear artist ui
   }
@@ -512,10 +522,56 @@ void encoder_init() {
   Serial.println(F("Motor ready."));
   _delay(1000);
 }
+
+// check wifi strength. set leds
+void GetNetworkInfo() {
+  connection.GetNetworkInfo(false);
+  int rssi = connection.RSSI;
+  // excellent strength
+  if(rssi >= -50) {
+    SetLed(HIGH, HIGH, HIGH, HIGH);
+  } else if(rssi >= -70) {
+    // good strength
+    SetLed(HIGH, HIGH, HIGH, LOW);
+  } else if(rssi >= -85) {
+    // weak
+    SetLed(HIGH, HIGH, LOW, LOW);
+  } else if(rssi >= -100) {
+    // very very weak
+    SetLed(HIGH, LOW, LOW, LOW);
+  } else {
+    // no
+    SetLed(LOW, LOW, LOW, LOW);
+  }
+}
+
+void SetLed(uint8_t led1, uint8_t led2, uint8_t led3, uint8_t led4) {
+  digitalWrite(LED_1, led1);
+  digitalWrite(LED_2, led2);
+  digitalWrite(LED_3, led3);
+  digitalWrite(LED_4, led4);
+
+}
+
 void setup() {
   Serial.begin(115200); /* Prepare for possible serial debug */
-  encoder_init();
+  // setup leds
+  pinMode(LED_1, OUTPUT);
+  pinMode(LED_2, OUTPUT);
+  pinMode(LED_3, OUTPUT);
+  pinMode(LED_4, OUTPUT);
+  SetLed(HIGH, LOW, LOW, LOW);
+  delay(500);
+  SetLed(HIGH, HIGH, LOW, LOW);
+  delay(500);
+  SetLed(HIGH, HIGH, HIGH, LOW);
+  delay(500);
+  SetLed(HIGH, HIGH, HIGH, HIGH);
+  delay(500);
+  SetLed(LOW, LOW, LOW, LOW);
+
   ui_setup();
+  encoder_init();
   spotify_setup();
   Serial.println("Setup done");
   getSong();
@@ -532,7 +588,10 @@ void setup() {
     checkPrev();
   });
 
-  
+  event_loop.onTick([] () {
+    GetNetworkInfo();
+  });
+
   event_loop.onTick([] () {
     motor.loopFOC();
     // to do: add reset to the max and min

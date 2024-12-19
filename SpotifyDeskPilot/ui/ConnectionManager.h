@@ -9,6 +9,7 @@ class ConnectionManager {
     void Connect();
     void GetNetworkInfo(bool printInfo);
     bool isConnected;
+    int RSSI;
   private:
     const char* _ssid;
     const char* _password;
