@@ -1,4 +1,4 @@
-# PlaybackPilot
+# Spotify Desk Pilot
 
 A device that controls the playback of Spotify using an ESP32 development board
 
@@ -62,6 +62,23 @@ the following ports are where each pin is connected:
 - next button connected to GPIO26
 - prev button connected to GPIO16
 
+## Connnecting TMC6300 Motor Encoder
+
+![TMC6300 Motor Encoder](https://github.com/user-attachments/assets/c2af66b9-84dd-4e51-b2aa-9008fa7f3766)
+- VIO: GPIO?
+- UL: GPIO22
+- UH: GPIO13
+- VL: GPIO12
+- VH: GPIO14
+- WH: GPIO25
+- WL: GPIO27
+- VCP: NOTHING
+- GND (both): GND
+- DIAG: NOTHING
+- SEN: NOTHING
+- U, V, W: any of the gimbal pwm inputs
+- VIN: 5V (AKA VIN ON ESP32)
+  
 # TODO/Design
 
 ![alt text](image.png)
@@ -76,17 +93,17 @@ the following ports are where each pin is connected:
 - [x] pause
 - [x] volume
 - [x] refresh auth tokens
-- [ ] async api calls
-- [ ] anti aliased text
 - [x] connect buttons to said Spotify methods
 - [x] connect magnetic encoder to control the above methods
 - [x] add gimbal motor haptic feedback to receive audio differences
+- [x] connect display to esp32 -> display UI on esp32 [setting up display](https://dronebotworkshop.com/gc9a01/)
+- [ ] async api calls
+- [ ] anti aliased text
 - [ ] add ability to connect board to WiFi without uploading code every time (probably requires seperate API calls) -[possible youtube solution](https://www.youtube.com/watch?v=JYtDibqJMs0&ab_channel=techiesms)
 - [ ] add ability to connect Spotify account without uploading code every time (probably requires seperate API calls)
 - [ ] figure out how to create a webhook to connect to Spotify playback (not possible with current Spotify documentation?)
 - [ ] design UI to display the info (playback etc)
 - [ ] find way to display image on ui
-- [ ] connect display to esp32 -> display UI on esp32 [setting up display](https://dronebotworkshop.com/gc9a01/)
 
 - possible Todo
   -> aux?
