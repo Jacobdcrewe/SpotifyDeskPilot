@@ -58,13 +58,15 @@ the following ports are where each pin is connected:
 
 ## BUTTON PINS
 
-- play button connected to GPIO17
-- next button connected to GPIO26
-- prev button connected to GPIO16
+- play button connected to GPIO39
+- next button connected to GPIO36
+- prev button connected to GPIO34
+- connect in pull up configuration (no built in input pullup for these pins)
 
 ## Connnecting TMC6300 Motor Encoder
 
 ![TMC6300 Motor Encoder](https://github.com/user-attachments/assets/c2af66b9-84dd-4e51-b2aa-9008fa7f3766)
+
 - VIO: GPIO?
 - UL: GPIO22
 - UH: GPIO13
@@ -78,7 +80,15 @@ the following ports are where each pin is connected:
 - SEN: NOTHING
 - U, V, W: any of the gimbal pwm inputs
 - VIN: 5V (AKA VIN ON ESP32)
-  
+
+## Connecting WIFI strength LED's
+
+- connect led to GND with 1k ohm resistor. connect positive to following pins
+- LED_1: GPIO26
+- LED_2: GPIO21
+- LED_3: GPIO19
+- LED_4: GPIO17
+
 # TODO/Design
 
 ![alt text](image.png)
