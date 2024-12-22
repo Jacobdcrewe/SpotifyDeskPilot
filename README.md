@@ -67,7 +67,7 @@ the following ports are where each pin is connected:
 
 ![TMC6300 Motor Encoder](https://github.com/user-attachments/assets/c2af66b9-84dd-4e51-b2aa-9008fa7f3766)
 
-- VIO: GPIO?
+- VIO: GPIO33
 - UL: GPIO22
 - UH: GPIO13
 - VL: GPIO12
