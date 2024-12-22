@@ -88,6 +88,10 @@ the following ports are where each pin is connected:
 - LED_2: GPIO21
 - LED_3: GPIO19
 - LED_4: GPIO17
+- 
+## Wiring Diagram
+![Wiring drawio](https://github.com/user-attachments/assets/67d128f7-de7a-4e82-a80b-b9e06b4b4a00)
+
 
 # TODO/Design
 
